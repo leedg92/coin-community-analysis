@@ -113,3 +113,4 @@ metastore_db/
 .cache/
 .history/
 .local/ 
+config/
