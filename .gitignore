@@ -113,4 +113,9 @@ metastore_db/
 .cache/
 .history/
 .local/ 
+<<<<<<< HEAD
 config/
+=======
+config/
+
+>>>>>>> dev_env_set
