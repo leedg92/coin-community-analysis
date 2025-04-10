@@ -50,4 +50,86 @@ INSERT INTO coins (symbol, name, current_price, market_cap, volume_24h, created_
 INSERT INTO posts (title, content, author, views, likes, created_at) VALUES
 ('Bitcoin price prediction', 'I think BTC will reach 100k by end of year', 'crypto_expert', 100, 25, CURRENT_TIMESTAMP),
 ('Ethereum merge success', 'The merge was successful, what are your thoughts?', 'eth_lover', 150, 30, CURRENT_TIMESTAMP),
-('Solana ecosystem growing', 'More dApps are being built on Solana', 'sol_developer', 80, 15, CURRENT_TIMESTAMP); 
+('Solana ecosystem growing', 'More dApps are being built on Solana', 'sol_developer', 80, 15, CURRENT_TIMESTAMP);
+
+-- Enable pgvector extension
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Raw data tables
+CREATE TABLE IF NOT EXISTS reddit_raw_submissions (
+    submission_id VARCHAR(50) PRIMARY KEY,
+    subreddit VARCHAR(100),
+    title TEXT,
+    selftext TEXT,
+    author VARCHAR(100),
+    created_utc TIMESTAMP,
+    score INTEGER,
+    num_comments INTEGER,
+    url TEXT,
+    permalink TEXT,
+    collected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS reddit_raw_comments (
+    comment_id VARCHAR(50) PRIMARY KEY,
+    submission_id VARCHAR(50) REFERENCES reddit_raw_submissions(submission_id),
+    parent_id VARCHAR(50),
+    author VARCHAR(100),
+    body TEXT,
+    created_utc TIMESTAMP,
+    score INTEGER,
+    collected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Analysis tables
+CREATE TABLE IF NOT EXISTS reddit_analysis_submissions (
+    submission_id VARCHAR(50) PRIMARY KEY REFERENCES reddit_raw_submissions(submission_id),
+    title_embedding VECTOR(384),
+    selftext_embedding VECTOR(384),
+    sentiment_score FLOAT,
+    sentiment_label VARCHAR(20),
+    analyzed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS reddit_analysis_comments (
+    comment_id VARCHAR(50) PRIMARY KEY REFERENCES reddit_raw_comments(comment_id),
+    embedding VECTOR(384),
+    sentiment_score FLOAT,
+    sentiment_label VARCHAR(20),
+    analyzed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Metadata table
+CREATE TABLE IF NOT EXISTS reddit_metadata (
+    id SERIAL PRIMARY KEY,
+    subreddit VARCHAR(100),
+    last_collected_at TIMESTAMP,
+    collection_status VARCHAR(20),
+    error_message TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes
+CREATE INDEX IF NOT EXISTS idx_submissions_subreddit ON reddit_raw_submissions(subreddit);
+CREATE INDEX IF NOT EXISTS idx_submissions_created_utc ON reddit_raw_submissions(created_utc);
+CREATE INDEX IF NOT EXISTS idx_comments_submission_id ON reddit_raw_comments(submission_id);
+CREATE INDEX IF NOT EXISTS idx_comments_created_utc ON reddit_raw_comments(created_utc);
+
+-- Create function for data retention
+CREATE OR REPLACE FUNCTION cleanup_old_data()
+RETURNS void AS $$
+BEGIN
+    -- Delete data older than 2 weeks
+    DELETE FROM reddit_raw_submissions 
+    WHERE created_utc < NOW() - INTERVAL '2 weeks';
+    
+    DELETE FROM reddit_raw_comments 
+    WHERE created_utc < NOW() - INTERVAL '2 weeks';
+    
+    DELETE FROM reddit_analysis_submissions 
+    WHERE analyzed_at < NOW() - INTERVAL '2 weeks';
+    
+    DELETE FROM reddit_analysis_comments 
+    WHERE analyzed_at < NOW() - INTERVAL '2 weeks';
+END;
+$$ LANGUAGE plpgsql; 
