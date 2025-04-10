@@ -33,6 +33,57 @@
 └── docker/           # 데이터 처리 컴포넌트 Docker 설정
 ```
 
+### 2.1 config 폴더 설정
+
+`config` 폴더는 프로젝트의 공통 설정 파일들을 포함합니다. 이 폴더는 `.gitignore`에 포함되어 있으므로, 프로젝트를 처음 클론한 후 다음 파일들을 생성해야 합니다:
+
+```
+config/
+├── .env              # 공통 환경 변수 설정
+├── database.json     # 데이터베이스 연결 설정
+├── api.json          # API 엔드포인트 설정
+└── logging.json      # 로깅 설정
+```
+
+각 파일의 예시 내용:
+
+```env
+# .env
+NODE_ENV=development
+PORT=3000
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/coindb
+```
+
+```json
+// database.json
+{
+  "host": "localhost",
+  "port": 5432,
+  "database": "coindb",
+  "username": "postgres",
+  "password": "postgres"
+}
+```
+
+```json
+// api.json
+{
+  "nodeBackend": "http://localhost:3001",
+  "javaBackend": "http://localhost:8080",
+  "bff": "http://localhost:3000"
+}
+```
+
+```json
+// logging.json
+{
+  "level": "info",
+  "format": "json",
+  "output": "file",
+  "path": "./logs"
+}
+```
+
 ## 3. 데이터베이스 설정
 
 ### 3.1 Docker Compose 설정
