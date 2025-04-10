@@ -1,128 +1,484 @@
-# 코인 데이터 & 커뮤니티 실시간 분석 시스템
+# Coin Community Analysis
 
-## 프로젝트 개요
-실시간 코인 시세와 커뮤니티 데이터를 연계 분석하는 시스템으로, 데이터 엔지니어링 핵심 기술 스택 습득을 목표로 합니다. 업비트 코인 시세와 디시인사이드 커뮤니티 데이터를 수집하여 실시간/배치 처리가 결합된 데이터 파이프라인을 구축합니다.
+실시간 코인 가격과 커뮤니티 데이터 분석 프로젝트
 
-## 기술 스택
-- **프론트엔드**: Next.js (React)
-- **인증 시스템**: Supabase Auth
-- **데이터 처리 백엔드**: Java Spring Boot / Python FastAPI
-- **데이터베이스**: PostgreSQL (로컬)
-- **실시간 데이터 처리**: WebSocket, Apache Kafka
-- **배치 처리**: Spring Batch / Apache Airflow
-- **컨테이너화**: Docker, Docker Compose
-- **시각화**: Recharts (React), D3.js
+## 목차
+1. [프로젝트 개요](#1-프로젝트-개요)
+2. [프로젝트 구조](#2-프로젝트-구조)
+3. [데이터베이스 설정](#3-데이터베이스-설정)
+4. [Node.js 백엔드 구현](#4-nodejs-백엔드-구현)
+5. [Java 백엔드 구현](#5-java-백엔드-구현)
+6. [BFF 구현](#6-bff-구현)
+7. [실행 방법](#7-실행-방법)
+8. [테스트](#8-테스트)
+9. [Python 데이터 처리](#9-python-데이터-처리)
 
-## 시스템 아키텍처
+## 1. 프로젝트 개요
 
-### 인증 시스템 (Supabase)
-- 사용자 회원가입/로그인 관리
-- 소셜 로그인 통합
-- JWT 토큰 발급 및 관리
-- 사용자 프로필 기본 정보 저장
+실시간 코인 커뮤니티 분석 플랫폼은 다음과 같은 기술 스택을 사용합니다:
 
-### 데이터 수집 시스템 (자체 구현)
-- **코인 데이터 수집**: 업비트 WebSocket을 통한 실시간 시세 데이터 수집 (10-20개 주요 코인)
-- **커뮤니티 데이터 수집**: 디시인사이드 코인 관련 게시판 크롤링 (5분 주기)
+- **프론트엔드**: Next.js (BFF 패턴)
+- **백엔드**: Node.js (Express), Java (Spring Boot)
+- **데이터베이스**: PostgreSQL
+- **개발 도구**: Docker, TypeScript
 
-### 데이터 처리 파이프라인
-- **실시간 처리**: 코인 시세 스트리밍 처리, 1분봉 데이터 생성
-- **배치 처리**: 커뮤니티 데이터 정기 수집 및 분석
+## 2. 프로젝트 구조
 
-### 데이터 저장소
-- **PostgreSQL**: 최근 2주 데이터 저장
-- **장기 저장소**: 2주 이상 데이터 (추후 AWS S3로 이식 가능)
+```
+├── frontend/          # Next.js 프론트엔드 (포트: 3002)
+├── bff/              # Backend for Frontend (포트: 3000)
+├── backend-node/     # Node.js 백엔드 (포트: 3001)
+├── backend-java/     # Java Spring Boot 백엔드 (포트: 8080)
+├── config/           # 공통 설정
+└── docker/           # 데이터 처리 컴포넌트 Docker 설정
+```
 
-## 구현 단계 및 일정
+## 3. 데이터베이스 설정
 
-### 1단계: 기본 환경 설정 (1주)
-- 개발 환경 구성 (Docker, PostgreSQL)
-- Supabase 프로젝트 설정 및 인증 시스템 구축
-- 프론트엔드 초기 설정 (Next.js)
+### 3.1 Docker Compose 설정
 
-### 2단계: 데이터 수집 시스템 구현 (2주)
-- 업비트 WebSocket 연결 및 실시간 데이터 수집
-- 디시인사이드 크롤러 구현
-- 데이터베이스 스키마 설계 및 구현
+```yaml
+# docker-compose.yml
+version: '3.8'
 
-### 3단계: 데이터 처리 및 분석 파이프라인 구축 (2주)
-- 실시간 데이터 처리 로직 구현
-- 배치 처리 시스템 구현
-- 데이터 분석 모듈 개발
+services:
+  postgres:
+    image: postgres:latest
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: coindb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
-### 4단계: 프론트엔드 개발 (2주)
-- 사용자 인증 UI 구현
-- 대시보드 및 데이터 시각화 구현
-- 실시간 업데이트 기능 구현
+volumes:
+  postgres_data:
+```
 
-### 5단계: 시스템 통합 및 최적화 (1주)
-- 백엔드와 프론트엔드 통합
-- 성능 최적화
-- 버그 수정 및 안정화
+### 3.2 데이터베이스 초기화
 
-## 인증 흐름 (Supabase와 로컬 시스템 통합)
+```sql
+-- init.sql
+CREATE TABLE IF NOT EXISTS test_messages (
+  id SERIAL PRIMARY KEY,
+  message TEXT NOT NULL,
+  source VARCHAR(10) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
-1. 사용자는 프론트엔드(Next.js)에서 Supabase Auth를 통해 로그인
-2. Supabase는 인증 성공 시 JWT 토큰 발급
-3. 프론트엔드는 이 토큰을 저장하고 모든 API 요청에 포함
-4. 로컬 백엔드 시스템은 JWT 토큰을 검증하여 사용자 인증 확인
-5. 인증된 요청에 대해 코인 데이터 및 분석 결과 제공
+-- 샘플 데이터
+INSERT INTO test_messages (message, source) VALUES
+  ('Hello from Java!', 'java'),
+  ('Hello from Node!', 'node');
+```
 
-## 데이터 흐름
+## 4. Node.js 백엔드 구현
 
-1. **코인 데이터**: 
-   업비트 → WebSocket 클라이언트 → 데이터 처리 → PostgreSQL → API → 프론트엔드
+### 4.1 프로젝트 초기화
 
-2. **커뮤니티 데이터**: 
-   디시인사이드 → 크롤러 → 데이터 정제 → PostgreSQL → API → 프론트엔드
-
-3. **사용자 설정 및 환경설정**: 
-   프론트엔드 → Supabase API → Supabase DB
-
-## 시작하기
-
-### 필수 조건
-- Docker 및 Docker Compose
-- Node.js 18 이상
-- Java 17 / Python 3.9 이상
-- PostgreSQL 14 이상
-
-### 설치 및 실행
 ```bash
-# 저장소 클론
-git clone https://github.com/leedg92/coin-community-analysis.git
-cd coin-community-analysis
+mkdir backend-node
+cd backend-node
+npm init -y
 
-# Docker 환경 실행
+# 의존성 설치
+npm install express pg cors dotenv
+npm install -D typescript @types/express @types/pg @types/cors @types/node @typescript-eslint/eslint-plugin @typescript-eslint/parser eslint ts-node-dev
+```
+
+### 4.2 TypeScript 설정
+
+```json
+// tsconfig.json
+{
+  "compilerOptions": {
+    "target": "es2018",
+    "module": "commonjs",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
+```
+
+### 4.3 환경 변수 설정
+
+```env
+# .env
+PORT=3001
+POSTGRES_USER=postgres
+POSTGRES_HOST=localhost
+POSTGRES_DB=coindb
+POSTGRES_PASSWORD=postgres
+POSTGRES_PORT=5432
+```
+
+### 4.4 데이터베이스 연결
+
+```typescript
+// src/config/database.ts
+import { Pool } from 'pg';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const pool = new Pool({
+  user: process.env.POSTGRES_USER,
+  host: process.env.POSTGRES_HOST,
+  database: process.env.POSTGRES_DB,
+  password: process.env.POSTGRES_PASSWORD,
+  port: parseInt(process.env.POSTGRES_PORT || '5432'),
+});
+
+export default pool;
+```
+
+### 4.5 API 라우터
+
+```typescript
+// src/routes/test.ts
+import { Router } from 'express';
+import pool from '../config/database';
+
+const router = Router();
+
+// Java 테스트 데이터 조회
+router.get('/java', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM test_messages WHERE source = $1',
+      ['java']
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('데이터 조회 중 오류 발생:', err);
+    res.status(500).json({ error: '데이터베이스 오류' });
+  }
+});
+
+// Node 테스트 데이터 조회
+router.get('/node', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM test_messages WHERE source = $1',
+      ['node']
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('데이터 조회 중 오류 발생:', err);
+    res.status(500).json({ error: '데이터베이스 오류' });
+  }
+});
+
+export default router;
+```
+
+### 4.6 메인 애플리케이션
+
+```typescript
+// src/index.ts
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import testRoutes from './routes/test';
+
+dotenv.config();
+
+const app = express();
+const port = process.env.PORT || 3001;
+
+app.use(cors());
+app.use(express.json());
+app.use('/api/test', testRoutes);
+
+app.listen(port, () => {
+  console.log(`서버가 포트 ${port}에서 실행 중입니다`);
+});
+```
+
+## 5. Java 백엔드 구현
+
+### 5.1 프로젝트 설정
+
+```xml
+<!-- pom.xml -->
+<dependencies>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.postgresql</groupId>
+        <artifactId>postgresql</artifactId>
+    </dependency>
+</dependencies>
+```
+
+### 5.2 애플리케이션 설정
+
+```yaml
+# application.yml
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/coindb
+    username: postgres
+    password: postgres
+  jpa:
+    hibernate:
+      ddl-auto: none
+server:
+  port: 8080
+```
+
+### 5.3 엔티티 클래스
+
+```java
+// TestMessage.java
+@Entity
+@Table(name = "test_messages")
+public class TestMessage {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String message;
+    private String source;
+    private LocalDateTime createdAt;
+    // Getters and Setters
+}
+```
+
+### 5.4 컨트롤러
+
+```java
+// TestController.java
+@RestController
+@RequestMapping("/api/test")
+@CrossOrigin
+public class TestController {
+    @Autowired
+    private TestMessageRepository repository;
+
+    @GetMapping("/java")
+    public List<TestMessage> getJavaMessages() {
+        return repository.findBySource("java");
+    }
+}
+```
+
+## 6. BFF 구현
+
+### 6.1 프로젝트 초기화
+
+```bash
+npx create-next-app@latest bff --typescript --tailwind --eslint
+cd bff
+```
+
+### 6.2 메인 페이지
+
+```typescript
+// src/app/page.tsx
+'use client';
+
+import { useState } from 'react';
+
+interface TestMessage {
+  id: number;
+  message: string;
+  source: string;
+  created_at: string;
+}
+
+export default function Home() {
+  const [messages, setMessages] = useState<TestMessage[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = async (source: 'java' | 'node') => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch(`http://localhost:3001/api/test/${source}`);
+      if (!response.ok) {
+        throw new Error('데이터를 가져오는데 실패했습니다');
+      }
+      const data = await response.json();
+      setMessages(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '오류가 발생했습니다');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center p-24">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold mb-4">
+          Hello, <span className="text-blue-500">코인 커뮤니티</span>!
+        </h1>
+        <p className="text-lg text-gray-600 mb-8">
+          실시간 코인 커뮤니티 분석 플랫폼에 오신 것을 환영합니다
+        </p>
+        
+        <div className="flex gap-4 justify-center mb-8">
+          <button
+            onClick={() => fetchData('java')}
+            className="bg-green-500 text-white px-6 py-2 rounded-lg hover:bg-green-600"
+          >
+            Java Test
+          </button>
+          <button
+            onClick={() => fetchData('node')}
+            className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600"
+          >
+            Node Test
+          </button>
+        </div>
+
+        {loading && <p>데이터를 불러오는 중...</p>}
+        {error && <p className="text-red-500">{error}</p>}
+        {messages.length > 0 && (
+          <div className="border rounded-lg p-4">
+            <h2 className="text-xl font-semibold mb-4">테스트 메시지</h2>
+            <ul className="space-y-2">
+              {messages.map((msg) => (
+                <li key={msg.id} className="text-left border-b pb-2">
+                  <p className="font-medium">{msg.message}</p>
+                  <p className="text-sm text-gray-500">
+                    출처: {msg.source} | 시간: {new Date(msg.created_at).toLocaleString()}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+## 7. 실행 방법
+
+### 7.1 데이터베이스 실행
+```bash
+# PostgreSQL 컨테이너 실행
 docker-compose up -d
 
-# 백엔드 실행
-cd backend
-./gradlew bootRun  # Java의 경우
-# 또는
-cd backend-python
-uvicorn main:app --reload  # Python FastAPI의 경우
+# 데이터베이스 초기화
+docker cp backend-node/init.sql postgres:/init.sql
+docker exec -i postgres psql -U postgres -d coindb -f /init.sql
+```
 
-# 프론트엔드 실행
-cd frontend
-npm install
+### 7.2 Node.js 백엔드 실행
+```bash
+cd backend-node
 npm run dev
+# 서버가 포트 3001에서 실행됩니다
 ```
 
-### 환경 변수 설정
-`.env` 파일을 생성하고 다음 변수를 설정하세요:
+### 7.3 Java 백엔드 실행
+```bash
+cd backend-java
+./mvnw spring-boot:run
+# 서버가 포트 8080에서 실행됩니다
 ```
-# Supabase 설정
-NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
 
-# 데이터베이스 설정
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=coindb
-DB_USER=postgres
-DB_PASSWORD=your-password
-
-# API 설정
-API_PORT=8080
+### 7.4 BFF 실행
+```bash
+cd bff
+npm run dev
+# 서버가 포트 3000에서 실행됩니다
 ```
+
+## 8. 테스트
+
+1. 웹 브라우저에서 http://localhost:3000 접속
+
+2. 버튼 테스트:
+   - "Java Test" 버튼 클릭: Java 백엔드에서 데이터 조회
+   - "Node Test" 버튼 클릭: Node.js 백엔드에서 데이터 조회
+
+3. 응답 데이터 확인:
+   - 메시지 내용
+   - 출처 (java/node)
+   - 생성 시간
+
+4. 에러 처리:
+   - 서버 연결 실패 시 에러 메시지 표시
+   - 로딩 중 상태 표시
+
+## 9. Python 데이터 처리
+
+### 9.1 Python 환경 설정
+
+1. 가상환경 생성 및 활성화:
+```bash
+# Windows
+python -m venv venv
+.\venv\Scripts\activate
+
+# Linux/Mac
+python3 -m venv venv
+source venv/bin/activate
+```
+
+2. 의존성 설치:
+```bash
+pip install -r requirements.txt
+```
+
+### 9.2 주요 Python 패키지
+
+- **데이터 처리**: pandas, numpy, scikit-learn
+- **데이터베이스**: psycopg2-binary, SQLAlchemy
+- **웹 크롤링**: beautifulsoup4, requests, selenium
+- **데이터 스트리밍**: kafka-python, confluent-kafka
+- **스파크 처리**: pyspark, delta-spark
+- **워크플로우**: apache-airflow
+
+### 9.3 개발 도구
+
+- **코드 포맷팅**: black
+- **린터**: flake8
+- **타입 체크**: mypy
+- **테스트**: pytest
+
+### 9.4 Git 설정
+
+프로젝트는 다음 파일들을 Git에서 제외합니다:
+
+1. 환경 설정 파일:
+   - `.env`, `.env.local`
+   - `airflow.cfg`
+
+2. 가상환경 및 캐시:
+   - `venv/`, `__pycache__/`
+   - `.pytest_cache/`
+
+3. 빌드 결과물:
+   - `dist/`, `build/`
+   - `node_modules/`
+   - `target/`
+
+4. IDE 설정:
+   - `.idea/`, `.vscode/`
+
+5. 로그 및 데이터 파일:
+   - `logs/`
+   - `*.csv`, `*.xlsx`
+   - `*.db`, `*.sqlite3`

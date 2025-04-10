@@ -1,0 +1,24 @@
+{
+  "name": "coin-community-analysis",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "bff",
+    "backend-node",
+    "config"
+  ],
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "@types/node": "^20.11.24"
+  },
+  "scripts": {
+    "dev": "concurrently \"cd frontend && npm run dev\" \"cd bff && npm run dev\" \"cd backend-node && npm run dev\"",
+    "install-all": "npm install && npm run install-deps",
+    "install-deps": "concurrently \"cd frontend && npm install\" \"cd bff && npm install\" \"cd backend-node && npm install\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.3.3"
+  }
+} 
